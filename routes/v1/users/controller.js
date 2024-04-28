@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcrypt')
+const db = require('../../../lib/firebase')
+const _ = require('lodash')
 
 const authenticate = async (req, res) => {
   try {
@@ -9,19 +11,20 @@ const authenticate = async (req, res) => {
 
     const { username, password } = req.body
 
-    const user = await db.User.findOne({
-      where: {
-        username,
-      },
-    })
+    const exists = await db
+      .collection('users')
+      .where('username', '==', username)
+      .get()
 
-    if (!user) {
+    if (exists.empty) {
       return res.status(401).send({
         message: 'Username or password is incorrect',
       })
     }
 
-    const match = await await bcrypt.compare(password, user.password)
+    const user = _.first(exists.docs).data()
+
+    const match = await bcrypt.compare(password, user.password)
 
     if (!match) {
       return res.status(401).send({
@@ -29,7 +32,7 @@ const authenticate = async (req, res) => {
       })
     }
 
-    const token = await jwt.sign(
+    const token = jwt.sign(
       {
         id: user.id,
         userRoleId: user.userRoleId,
@@ -46,6 +49,12 @@ const authenticate = async (req, res) => {
   }
 }
 
+/**
+ *
+ * @param {import('fastify').FastifyRequest} req
+ * @param {import('fastify').FastifyReply} res
+ * @returns {Promise<import('fastify').FastifyReply>}
+ */
 const add = async (req, res) => {
   try {
     if (req.validationError) {
@@ -57,13 +66,28 @@ const add = async (req, res) => {
     const salt = await bcrypt.genSalt(10)
     const hash = await bcrypt.hash(password, salt)
 
-    const user = await db.User.create({
+    const exists = await db
+      .collection('users')
+      .where('username', '==', username)
+      .get()
+
+    if (!exists.empty) {
+      return res.status(400).send({
+        message: 'Username already exists',
+      })
+    }
+
+    const doc = await db.collection('users').add({
       username,
       password: hash,
       userRoleId,
     })
+    const snapshot = await doc.get()
 
-    return res.status(201).send(user)
+    return res.status(201).send({
+      id: snapshot.id,
+      ...snapshot.data(),
+    })
   } catch (error) {
     return res.status(500).send(error)
   }
@@ -75,10 +99,14 @@ const getAll = async (req, res) => {
       return res.status(400).send(req.validationError)
     }
 
-    const users = await db.User.findAll({
-      attributes: {
-        exclude: ['password', 'createdAt', 'updatedAt'],
-      },
+    const snapshot = await db.collection('users').get()
+    const users = []
+
+    snapshot.forEach((doc) => {
+      const data = doc.data()
+      data.id = doc.id
+      delete data.password
+      users.push(data)
     })
 
     return res.status(200).send(users)

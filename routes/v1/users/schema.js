@@ -1,25 +1,69 @@
-const schema = require("./schema");
-const controller = require("./controller");
+// schema
+const authenticate = {
+  description: 'Authenticate a user',
+  tags: ['Users'],
+  body: {
+    type: 'object',
+    properties: {
+      username: { type: 'string' },
+      password: { type: 'string' },
+    },
+    required: ['username', 'password'],
+  },
+  response: {
+    200: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+      },
+    },
+  },
+}
 
-module.exports = async function (fastify, opts) {
-  fastify.route({
-    method: "POST",
-    url: "/authenticate",
-    schema: schema.authenticate,
-    handler: controller.authenticate,
-  });
+const add = {
+  description: 'Add a user',
+  tags: ['Users'],
+  body: {
+    type: 'object',
+    properties: {
+      username: { type: 'string' },
+      password: { type: 'string' },
+      userRoleId: { type: 'integer' },
+    },
+    required: ['username', 'password', 'userRoleId'],
+  },
+  response: {
+    201: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        username: { type: 'string' },
+        userRoleId: { type: 'integer' },
+      },
+    },
+  },
+}
 
-  fastify.route({
-    method: "POST",
-    url: "/",
-    schema: schema.add,
-    handler: controller.add,
-  });
+const getAll = {
+  description: 'Get all users',
+  tags: ['Users'],
+  response: {
+    200: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          username: { type: 'string' },
+          userRoleId: { type: 'integer' },
+        },
+      },
+    },
+  },
+}
 
-  fastify.route({
-    method: "GET",
-    url: "/",
-    schema: schema.getAll,
-    handler: controller.getAll,
-  });
-};
+module.exports = {
+  authenticate,
+  add,
+  getAll,
+}
